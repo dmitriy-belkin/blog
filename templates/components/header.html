@@ -1,0 +1,22 @@
+<header>
+        <div class="header-logo">
+            <a href="/">Dmitriy Belkin</a>
+        </div>
+        <div>
+        <div class="header-auth">
+            <nav>
+            {% if user %}
+                <a href="/logout">Logout</a>
+            {% else %}
+                <a href="/login">Enter</a>
+            {% endif %}
+            </nav>
+        </div>
+        <div class="header-toggle">
+            <img src="./static/img/lamp.png" id="theme-toggle" class="toggle-icon" alt="theme-toggle">
+        </div>
+        </div>
+    <!--    <div class="title-h1">-->
+<!--        <h1>{{ title }}</h1>-->
+<!--    </div>-->
+</header>

@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>Login</h1>
+    <form method="post" action="/token">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+        <button type="submit">Login</button>
+    </form>
+    {% if error == 'incorrect_credentials' %}
+    <p style="color:red;">Incorrect username or password</p>
+    {% endif %}
+</div>
+                <li><a href="/register">Register</a></li>
+{% endblock %}
