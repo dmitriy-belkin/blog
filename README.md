@@ -64,3 +64,8 @@ alembic upgrade head
 ```bash
 uvicorn main:app --reload
 ```
+
+## Запуск Docker Compose
+```bash
+docker-compose up --build
+```
