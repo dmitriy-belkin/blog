@@ -1,0 +1,13 @@
+/* button.css */
+
+button {
+    padding: 10px;
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: var(--button-bg-hover);
+}

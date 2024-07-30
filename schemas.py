@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, constr, validator
 from typing import Optional
 
 
@@ -13,12 +13,18 @@ class TokenData(BaseModel):
 
 class UserBase(BaseModel):
     username: str
-    email: str
+    email: EmailStr
     full_name: Optional[str] = None
 
 
 class UserCreate(UserBase):
-    password: str
+    password: constr(min_length=8)
+
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        return v
 
 
 class User(UserBase):
@@ -26,11 +32,11 @@ class User(UserBase):
     is_active: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # изменено с orm_mode
 
 
 class ArticleBase(BaseModel):
-    title: str
+    title: constr(min_length=1)
     content: str
 
 
@@ -43,4 +49,12 @@ class Article(ArticleBase):
     owner_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+    def as_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "content": self.content,
+            "owner_id": self.owner_id
+        }

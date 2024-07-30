@@ -1,0 +1,74 @@
+/* style.css */
+
+@import url('variables.css');
+@import url('components/header.css');
+@import url('components/footer.css');
+@import url('components/button.css');
+/* Добавьте здесь другие импорты по мере необходимости */
+
+@font-face {
+   font-family: DiaryOfAn8BitMage-lYDD;
+   src: url(DiaryOfAn8BitMage-lYDD.ttf);
+}
+
+body {
+    font-family: DiaryOfAn8BitMage-lYDD, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    padding: 20px;
+}
+
+h1 {
+    font-size: 2em;
+}
+
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+li {
+    margin: 10px 0;
+}
+
+a {
+    color: var(--link-color);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.toggle-icon {
+    cursor: pointer;
+    width: 24px;
+    height: auto;
+}
+
+/* Адаптивный дизайн */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 1.5em;
+    }
+
+    button {
+        padding: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.2em;
+    }
+
+    button {
+        padding: 6px;
+    }
+}

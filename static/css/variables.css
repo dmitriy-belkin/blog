@@ -1,0 +1,21 @@
+/* variables.css */
+
+/* Светлая тема */
+:root {
+    --bg-color: #ffffff;
+    --text-color: #000000;
+    --link-color: #1a0dab;
+    --button-bg: #e0e0e0;
+    --button-text: #000000;
+    --button-bg-hover: #d5d5d5;
+}
+
+/* Темная тема */
+body.dark-theme {
+    --bg-color: #03050A;
+    --text-color: #ffffff;
+    --link-color: #8ab4f8;
+    --button-bg: #333333;
+    --button-text: #ffffff;
+    --button-bg-hover: #444444;
+}

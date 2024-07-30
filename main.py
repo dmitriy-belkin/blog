@@ -10,13 +10,15 @@ from jose import jwt, JWTError
 from datetime import timedelta
 from sqlalchemy.orm import Session
 import markdown
-import redis
+import json
+import redis.asyncio as redis
 from database import SessionLocal, engine, Base
 from models import User
 from auth import authenticate_user, create_access_token, get_password_hash, get_current_active_user
-from schemas import Token, Article, User
+from schemas import Token, Article, UserCreate, User
 from config import settings
 
+# Создание таблиц
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -27,7 +29,7 @@ app.mount("/articles", StaticFiles(directory="articles"), name="articles")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Инициализация Redis
-redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+redis_client = redis.from_url("redis://localhost:6379", encoding="utf-8", decode_responses=True)
 
 
 # Добавление обработчика ошибок
@@ -41,6 +43,11 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(status_code=400, content={"detail": exc.errors(), "body": exc.body})
+
+
+@app.exception_handler(HTTPException)
+async def authentication_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 # Dependency
@@ -81,14 +88,20 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return response
 
 
-@app.post("/register", response_model=User)
-def register_user(username: str = Form(...), password: str = Form(...), email: str = Form(...), full_name: str = Form(...), db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.username == username).first()
+@app.post("/register", response_model=User, tags=["Auth"])
+def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user_create.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
 
-    hashed_password = get_password_hash(password)
-    new_user = User(username=username, full_name=full_name, email=email, hashed_password=hashed_password, is_active=True)
+    hashed_password = get_password_hash(user_create.password)
+    new_user = User(
+        username=user_create.username,
+        full_name=user_create.full_name,
+        email=user_create.email,
+        hashed_password=hashed_password,
+        is_active=True
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -139,8 +152,15 @@ async def list_articles(db: Session = Depends(get_db)):
     """
     List all articles.
     """
+    cached_articles = await redis_client.get("articles")
+    if cached_articles:
+        return json.loads(cached_articles)
+
     articles = db.query(Article).all()
-    return articles
+    articles_data = [article.as_dict() for article in articles]
+    await redis_client.set("articles", json.dumps(articles_data))
+
+    return articles_data
 
 
 @app.get("/login", response_class=HTMLResponse, tags=["Auth"])
