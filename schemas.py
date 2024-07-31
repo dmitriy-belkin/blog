@@ -20,19 +20,13 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: constr(min_length=8)
 
-    @validator('password')
-    def validate_password(cls, v):
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        return v
-
 
 class User(UserBase):
     id: int
     is_active: bool
 
     class Config:
-        from_attributes = True  # изменено с orm_mode
+        from_attributes = True
 
 
 class ArticleBase(BaseModel):

@@ -10,29 +10,32 @@ from jose import jwt, JWTError
 from datetime import timedelta
 from sqlalchemy.orm import Session
 import markdown
+import sentry_sdk
 import json
 import redis.asyncio as redis
 from database import SessionLocal, engine, Base
-from models import User
+from models import User as UserModel, Article
 from auth import authenticate_user, create_access_token, get_password_hash, get_current_active_user
-from schemas import Token, Article, UserCreate, User
+from schemas import Token, UserCreate, User
 from config import settings
 
-# Создание таблиц
+sentry_sdk.init(
+    dsn="https://f1f2c823d1a967ea8053febf9287b14f@o4507696840638464.ingest.de.sentry.io/4507696842997840",
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Подключение шаблонов и статических файлов
 templates = Jinja2Templates(directory="templates")
 app.mount("/articles", StaticFiles(directory="articles"), name="articles")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Инициализация Redis
 redis_client = redis.from_url("redis://localhost:6379", encoding="utf-8", decode_responses=True)
 
 
-# Добавление обработчика ошибок
 @app.exception_handler(StarletteHTTPException)
 async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
     if exc.status_code == HTTP_404_NOT_FOUND:
@@ -42,7 +45,19 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(status_code=400, content={"detail": exc.errors(), "body": exc.body})
+    errors = exc.errors()
+    for error in errors:
+        for loc, msg in error.items():
+            if isinstance(msg, bytes):
+                error[loc] = msg.decode('utf-8')
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "body": exc.body,
+        }
+    )
 
 
 @app.exception_handler(HTTPException)
@@ -50,7 +65,6 @@ async def authentication_exception_handler(request: Request, exc: HTTPException)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
-# Dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -66,7 +80,7 @@ def get_authenticated_user(request: Request, db: Session = Depends(get_db)):
             payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
             username = payload.get("sub")
             if username:
-                user = db.query(User).filter(User.username == username).first()
+                user = db.query(UserModel).filter(UserModel.username == username).first()
                 if user:
                     return user
         except JWTError:
@@ -89,13 +103,13 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 
 @app.post("/register", response_model=User, tags=["Auth"])
-def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.username == user_create.username).first()
+async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(UserModel).filter(UserModel.username == user_create.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
 
     hashed_password = get_password_hash(user_create.password)
-    new_user = User(
+    new_user = UserModel(
         username=user_create.username,
         full_name=user_create.full_name,
         email=user_create.email,
@@ -110,10 +124,7 @@ def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/upload", tags=["Articles"])
 async def upload_article(title: str = Form(...), file: UploadFile = File(...),
-                         current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    """
-    Upload a new markdown article.
-    """
+                         current_user: UserModel = Depends(get_current_active_user), db: Session = Depends(get_db)):
     if file.content_type != "text/markdown":
         raise HTTPException(status_code=400, detail="Invalid file type")
 
@@ -132,9 +143,6 @@ async def upload_article(title: str = Form(...), file: UploadFile = File(...),
 
 @app.get("/articles/{article_id}", response_class=HTMLResponse, tags=["Articles"])
 async def read_article(request: Request, article_id: int, db: Session = Depends(get_db)):
-    """
-    Read a specific article by ID.
-    """
     user = get_authenticated_user(request, db)
     if user is None:
         return RedirectResponse(url="/login")
@@ -149,9 +157,6 @@ async def read_article(request: Request, article_id: int, db: Session = Depends(
 
 @app.get("/articles", tags=["Articles"])
 async def list_articles(db: Session = Depends(get_db)):
-    """
-    List all articles.
-    """
     cached_articles = await redis_client.get("articles")
     if cached_articles:
         return json.loads(cached_articles)
@@ -175,5 +180,5 @@ async def register_form(request: Request):
 
 @app.get("/", response_class=HTMLResponse, tags=["General"])
 async def homepage(request: Request):
-    user = get_authenticated_user(request)
+    user = get_authenticated_user(request, db=Depends(get_db))
     return templates.TemplateResponse("index.html", {"request": request, "user": user})

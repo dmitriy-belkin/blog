@@ -3,6 +3,8 @@
 {% block content %}
 <div class="container">
     <h1>{{ title }}</h1>
+        {% include 'components/bio.html' %}
+
     {% if user %}
     <ul>
         {% for article in articles %}

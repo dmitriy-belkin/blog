@@ -1,7 +1,4 @@
-/* header.css */
-
 header {
-    overflow: hidden;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -10,8 +7,32 @@ header {
     color: var(--text-color);
 }
 
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.header-logo {
+    margin-right: auto;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+img {
+    padding-right: 5vh;
+}
+
+.header-toggle img {
+    cursor: pointer;
+}
+
 header a {
-    float: left;
     text-align: center;
     padding: 12px;
     text-decoration: none;
