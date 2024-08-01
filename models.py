@@ -10,8 +10,9 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     full_name = Column(String)
     email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
+    password = Column(String)
     is_active = Column(Boolean, default=True)
+    access_lvl = Column(Integer, default=0)
 
     articles = relationship("Article", back_populates="owner")
 
@@ -21,7 +22,8 @@ class User(Base):
             "username": self.username,
             "full_name": self.full_name,
             "email": self.email,
-            "is_active": self.is_active
+            "is_active": self.is_active,
+            "access_lvl": self.access_lvl
         }
 
 

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }}</title>
+  <link type="text/css" rel="stylesheet" href="{{ swagger_css_url }}">
+  <link type="text/css" rel="stylesheet" href="{{ swagger_favicon_url }}">
+  <style>
+    body {
+      background-color: #333;
+      color: #fff;
+    }
+    .swagger-ui .topbar {
+      background-color: #333;
+    }
+    .swagger-ui .topbar a span {
+      color: #fff;
+    }
+    .swagger-ui .info h1, .swagger-ui .info p {
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="{{ swagger_js_url }}"></script>
+<script src="{{ swagger_ui_bundle_url }}"></script>
+<script>
+  window.onload = function() {
+    const ui = SwaggerUIBundle({
+      url: "{{ swagger_url }}",
+      dom_id: '#swagger-ui',
+      presets: [
+        SwaggerUIBundle.presets.apis,
+        SwaggerUIStandalonePreset
+      ],
+      layout: "StandaloneLayout"
+    })
+    window.ui = ui
+  }
+</script>
+</body>
+</html>

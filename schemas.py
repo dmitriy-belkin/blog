@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, constr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 import re
 
@@ -10,19 +10,18 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: constr(min_length=8) = Field(...,
-                                           title="Пароль",
-                                           description="Password must be at least 8 characters long and include at "
-                                                       "least one uppercase letter, one lowercase letter, one number, "
-                                                       "and one special character")
+    password: str = Field(
+        ...,
+        title="Password",
+        description="Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character"
+    )
 
     @field_validator('password')
     def validate_password(cls, v):
         pattern = r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
         if not re.match(pattern, v):
             raise ValueError(
-                'Пароль должен содержать минимум 8 символов, одну заглавную букву, '
-                'одну строчную букву, одну цифру и один специальный символ'
+                'Пароль должен содержать минимум 8 символов, одну заглавную букву, одну строчную букву, одну цифру и один специальный символ'
             )
         return v
 

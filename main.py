@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.docs import get_swagger_ui_html
 import sentry_sdk
 import redis.asyncio as redis
 from database import Base, engine
@@ -24,7 +25,12 @@ sentry_sdk.init(
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(
+    title="Dmitriy Belkin Blog - Stage",
+    version="0.2.0",
+    docs_url="/api/v1/swagger",
+    redoc_url="/api/v1/redoc"
+)
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/articles", StaticFiles(directory="articles"), name="articles")
@@ -38,6 +44,19 @@ app.include_router(article_routes.router, prefix="/articles", tags=["Articles"])
 app.add_exception_handler(StarletteHTTPException, custom_http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(HTTPException, authentication_exception_handler)
+
+@app.get("/api/v1/swagger", include_in_schema=False)
+async def custom_swagger_ui_html():
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="Custom API Docs",
+        swagger_js_url="/static/swagger-ui-bundle.js",
+        swagger_css_url="/static/swagger-ui.css",
+        swagger_ui_bundle_url="/static/swagger-ui-standalone-preset.js",
+        swagger_favicon_url="/static/favicon.ico",
+        swagger_url="/static/swagger.yaml",
+        template_name="swagger_ui.html",
+    )
 
 
 def get_authenticated_user(request: Request, db: Session = Depends(get_db)):

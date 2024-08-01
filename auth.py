@@ -1,7 +1,6 @@
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
-
 from database import get_db
 from models import User as UserModel
 from datetime import datetime, timedelta
@@ -11,8 +10,8 @@ from fastapi import HTTPException, status, Depends
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password, password):
+    return pwd_context.verify(plain_password, password)
 
 
 def get_password_hash(password):
@@ -23,7 +22,7 @@ def authenticate_user(db: Session, username: str, password: str):
     user = db.query(UserModel).filter(UserModel.username == username).first()
     if not user:
         return False
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(password, user.password):
         return False
     return user
 
