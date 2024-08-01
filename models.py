@@ -15,6 +15,15 @@ class User(Base):
 
     articles = relationship("Article", back_populates="owner")
 
+    def as_dict(self):
+        return {
+            "id": self.id,
+            "username": self.username,
+            "full_name": self.full_name,
+            "email": self.email,
+            "is_active": self.is_active
+        }
+
 
 class Article(Base):
     __tablename__ = "articles"

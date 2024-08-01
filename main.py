@@ -1,26 +1,23 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, status, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.exceptions import RequestValidationError
+from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.status import HTTP_404_NOT_FOUND
-from jose import jwt, JWTError
-from datetime import timedelta
-from sqlalchemy.orm import Session
-import markdown
+from fastapi.exceptions import RequestValidationError
 import sentry_sdk
-import json
 import redis.asyncio as redis
-from database import SessionLocal, engine, Base
-from models import User as UserModel, Article
-from auth import authenticate_user, create_access_token, get_password_hash, get_current_active_user
-from schemas import Token, UserCreate, User
+from database import Base, engine
+from routes import user_routes, article_routes
 from config import settings
+from utils.error_handlers import (custom_http_exception_handler, validation_exception_handler,
+                                  authentication_exception_handler)
+from sqlalchemy.orm import Session
+from models import User as UserModel
+from jose import jwt, JWTError
+from database import get_db
 
 sentry_sdk.init(
-    dsn="https://f1f2c823d1a967ea8053febf9287b14f@o4507696840638464.ingest.de.sentry.io/4507696842997840",
+    dsn=settings.sentry_dsn,
     traces_sample_rate=1.0,
     profiles_sample_rate=1.0,
 )
@@ -35,42 +32,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 redis_client = redis.from_url("redis://localhost:6379", encoding="utf-8", decode_responses=True)
 
+app.include_router(user_routes.router, prefix="/user", tags=["User"])
+app.include_router(article_routes.router, prefix="/articles", tags=["Articles"])
 
-@app.exception_handler(StarletteHTTPException)
-async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
-    if exc.status_code == HTTP_404_NOT_FOUND:
-        return templates.TemplateResponse("404.html", {"request": request}, status_code=exc.status_code)
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    errors = exc.errors()
-    for error in errors:
-        for loc, msg in error.items():
-            if isinstance(msg, bytes):
-                error[loc] = msg.decode('utf-8')
-
-    return JSONResponse(
-        status_code=422,
-        content={
-            "detail": exc.errors(),
-            "body": exc.body,
-        }
-    )
-
-
-@app.exception_handler(HTTPException)
-async def authentication_exception_handler(request: Request, exc: HTTPException):
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+app.add_exception_handler(StarletteHTTPException, custom_http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(HTTPException, authentication_exception_handler)
 
 
 def get_authenticated_user(request: Request, db: Session = Depends(get_db)):
@@ -88,84 +55,10 @@ def get_authenticated_user(request: Request, db: Session = Depends(get_db)):
     return None
 
 
-@app.post("/token", response_model=Token, tags=["Auth"])
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        return RedirectResponse(url="/login?error=incorrect_credentials", status_code=status.HTTP_302_FOUND)
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
-    response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
-    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
-    return response
-
-
-@app.post("/register", response_model=User, tags=["Auth"])
-async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(UserModel).filter(UserModel.username == user_create.username).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
-
-    hashed_password = get_password_hash(user_create.password)
-    new_user = UserModel(
-        username=user_create.username,
-        full_name=user_create.full_name,
-        email=user_create.email,
-        hashed_password=hashed_password,
-        is_active=True
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
-
-
-@app.post("/upload", tags=["Articles"])
-async def upload_article(title: str = Form(...), file: UploadFile = File(...),
-                         current_user: UserModel = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    if file.content_type != "text/markdown":
-        raise HTTPException(status_code=400, detail="Invalid file type")
-
-    content = await file.read()
-    new_article = Article(
-        title=title,
-        content=content.decode("utf-8"),
-        owner_id=current_user.id
-    )
-    db.add(new_article)
-    db.commit()
-    db.refresh(new_article)
-
-    return {"title": title}
-
-
-@app.get("/articles/{article_id}", response_class=HTMLResponse, tags=["Articles"])
-async def read_article(request: Request, article_id: int, db: Session = Depends(get_db)):
+@app.get("/", response_class=HTMLResponse, tags=["General"])
+async def homepage(request: Request, db: Session = Depends(get_db)):
     user = get_authenticated_user(request, db)
-    if user is None:
-        return RedirectResponse(url="/login")
-
-    article = db.query(Article).filter(Article.id == article_id).first()
-    if not article:
-        raise HTTPException(status_code=404, detail="Article not found")
-
-    html_content = markdown.markdown(article.content)
-    return templates.TemplateResponse("article.html", {"request": request, "article": article, "content": html_content})
-
-
-@app.get("/articles", tags=["Articles"])
-async def list_articles(db: Session = Depends(get_db)):
-    cached_articles = await redis_client.get("articles")
-    if cached_articles:
-        return json.loads(cached_articles)
-
-    articles = db.query(Article).all()
-    articles_data = [article.as_dict() for article in articles]
-    await redis_client.set("articles", json.dumps(articles_data))
-
-    return articles_data
+    return templates.TemplateResponse("index.html", {"request": request, "user": user})
 
 
 @app.get("/login", response_class=HTMLResponse, tags=["Auth"])
@@ -174,11 +67,5 @@ async def login_form(request: Request, error: str = None):
 
 
 @app.get("/register", response_class=HTMLResponse, tags=["Auth"])
-async def register_form(request: Request):
+async def register_user_form(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
-
-
-@app.get("/", response_class=HTMLResponse, tags=["General"])
-async def homepage(request: Request):
-    user = get_authenticated_user(request, db=Depends(get_db))
-    return templates.TemplateResponse("index.html", {"request": request, "user": user})
