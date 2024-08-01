@@ -69,3 +69,40 @@ uvicorn main:app --reload
 ```bash
 docker-compose up --build
 ```
+
+## Запуск через hypercorn
+```bash
+hypercorn -c hypercorn.toml main:app
+```
+
+## Структура проекта
+```
+blog/
+├── alembic/                 # директория для миграций
+├── articles/                # статические файлы статей
+├── routes/                  # маршруты
+├── static/                  # статические файлы (CSS, JS, изображения)
+│   ├── css/
+│   ├── img/
+│   └── js/
+├── templates/               # шаблоны Jinja2
+│   ├── components/
+│   └── layouts/
+├── utils/                   # утилиты и вспомогательные функции
+├── .gitignore
+├── Dockerfile
+├── README.md
+├── alembic.ini
+├── auth.py                  # авторизация и аутентификация
+├── config.py                # конфигурационные файлы
+├── database.py              # настройки базы данных
+├── docker-compose.yml
+├── exceptions.py            # обработка исключений
+├── hypercorn.toml
+├── hypercorn_config.py
+├── init_db.py               # инициализация базы данных
+├── main.py                  # основной файл приложения
+├── models.py                # модели базы данных
+├── requirements.txt
+└── schemas.py               # схемы данных
+```
