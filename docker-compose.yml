@@ -10,8 +10,10 @@ services:
       - "8000:8000"
     depends_on:
       - db
+      - redis
     environment:
       - DATABASE_URL=postgresql://blogger:1234567@db:5432/blog
+      - REDIS_URL=redis://redis:6379/0
 
   db:
     image: postgres:14
@@ -21,6 +23,11 @@ services:
       POSTGRES_USER: blogger
       POSTGRES_PASSWORD: 1234567
       POSTGRES_DB: blog
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
 
 volumes:
   postgres_data:

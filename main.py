@@ -10,11 +10,12 @@ from jose import jwt, JWTError
 from datetime import timedelta
 from sqlalchemy.orm import Session
 import markdown
-import redis
+import json
+from redis_client import get_redis, close_redis
 from database import SessionLocal, engine, Base
-from models import User
+from models import User, Article
 from auth import authenticate_user, create_access_token, get_password_hash, get_current_active_user
-from schemas import Token, Article, User
+from schemas import Token, User as UserSchema
 from config import settings
 
 Base.metadata.create_all(bind=engine)
@@ -25,9 +26,6 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 app.mount("/articles", StaticFiles(directory="articles"), name="articles")
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Инициализация Redis
-redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
 
 # Добавление обработчика ошибок
@@ -67,6 +65,16 @@ def get_authenticated_user(request: Request, db: Session = Depends(get_db)):
     return None
 
 
+@app.on_event("startup")
+async def startup():
+    await get_redis()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await close_redis()
+
+
 @app.post("/token", response_model=Token, tags=["Auth"])
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.username, form_data.password)
@@ -81,14 +89,16 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return response
 
 
-@app.post("/register", response_model=User)
-def register_user(username: str = Form(...), password: str = Form(...), email: str = Form(...), full_name: str = Form(...), db: Session = Depends(get_db)):
+@app.post("/register", response_model=UserSchema)
+def register_user(username: str = Form(...), password: str = Form(...), email: str = Form(...),
+                  full_name: str = Form(...), db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
 
     hashed_password = get_password_hash(password)
-    new_user = User(username=username, full_name=full_name, email=email, hashed_password=hashed_password, is_active=True)
+    new_user = User(username=username, full_name=full_name, email=email, hashed_password=hashed_password,
+                    is_active=True)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -139,7 +149,15 @@ async def list_articles(db: Session = Depends(get_db)):
     """
     List all articles.
     """
+    redis = await get_redis()
+    cached_articles = await redis.get("articles")
+    if cached_articles:
+        articles = json.loads(cached_articles)
+        return articles
+
     articles = db.query(Article).all()
+    articles_data = [article.as_dict() for article in articles]
+    await redis.set("articles", json.dumps(articles_data))
     return articles
 
 

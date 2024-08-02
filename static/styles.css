@@ -12,18 +12,21 @@ body {
     padding: 0;
 }
 
-header {
+.header {
     overflow: hidden;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     padding: 10px;
     background-color: var(--bg-color);
     color: var(--text-color);
 }
 
-header a {
-  float: left;
+.header img {
+margin-right: 5vh;
+}
+
+.header a {
   text-align: center;
   padding: 12px;
   text-decoration: none;
@@ -109,6 +112,20 @@ body.dark-theme {
   justify-content: center;
   align-items: center;
   gap: 0.2rem;
+}
+
+.not-found-page {
+  text-align: center;
+  padding-top: 10%;
+}
+
+.not-found-link {
+  margin-top: 7vh;
+}
+
+.not-found-link a {
+  text-decoration: none;
+  font-size: 1.1em;
 }
 
 /* Адаптивный дизайн */
